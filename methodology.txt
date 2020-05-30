@@ -1,0 +1,129 @@
+   METHODOLOGY / METHOD / EXPERIMENT
+
+   The general format of the experiment was set up with 2 machienes, one acting as a network
+   simulator, which has the task of generating network traffic for the experiment, and the other 
+   was the test macheine, which ran the experiments and recorded results. 
+
+   This of course is not the only way that the experiment could have been performed. For instance,
+   two 10Gbit network cards (or even a single one with two ports, such as the X540-T2) could be set
+   up on the same machiene, using one port for transmission and the other for recieving. Another
+   idea could be to use virtual machienes as the transmitting and recieving deviecs. However, both
+   of these ideas introduce hidden variables that might not be taken into account when performing
+   the experiment. For example, one of the systems that exists in computers and is part of the
+   pipeline from network wire to cpu is the bus speed. Although this is not normally an issue, it
+   still has a maximum bandwidth. For example the Network card that is used in the experiment has a
+   8 lane pci speed of 5.0GT/s. Although this is definatly enough to handle 10Gbits/s, adding two
+   ports to a single pci slot is one extra thing that could become a potential bottleneck, so it is
+   best to avoid things like this if possible. 
+
+   Of course another problem of using dual ports on a single machiene or virtual machienes is that
+   the transmitting and recieving processes now have to content for cpu resources. All of these
+   factors are things that we would want to minimise while testing. Having seperate machiens also
+   closely mimics a real world network, another reason why it was chosen as the test setup.
+
+   One of the first problems encountered while designing the experiment was the problem of how to
+   generate substantially fast network traffic. Since we did not have a real life 10Gbit/s+ network
+   to test on, the author had to come up with a way to generate this amount of traffic with only the
+   materials avaliable to him. (Also, it probably wouldn't be wise to perform this experiment on a
+   real network, as the results would be inconsistant. e.g. you wouldnt have consistantly sized
+   packets, and the network might not always be running at one particular speed.). The original
+   problem stated in this report is that a Linux kernel is not capable recieving 10Gbits/s traffic.
+   This is later shown in the results. So from this, we can also safely presume that it is not able
+   to generate high speed traffic either. Expensive and purpose build hardware might be possible in
+   this situation, but due to budget constraits this was not possible in this case. Another soultion
+   might have been to generate traffic from multiple machienes and forward and funnel to to the test
+   machiene. Again, this would have needed more physical hardware, as well as a switch that could
+   forward the traffic to the test machiene. Also this would have involved considerably more
+   communication and co-operation and timing between the seperate network simulators. 
+
+   The option that remained was to use a single machiene, but use some software that was capable of
+   doing what was required. Several packet generator tools were tested out, but there were very few
+   that gave the required speed, were free, and had sufficient functionality. Eventually a packet
+   generation tool "pktgen" was selected. This is a packet generation tool that is built on top of the
+   DPDK framework. This raises the obvious question of: 'If the packet generation tool is build upon
+   DPDK, then isn't that going to be a limiting factor during testing'. The answer is yes, the
+   maximum bandwidth that we can test for is limited by the generation framwork, which is also
+   something we are testing. However, from the results we can see that this tool is definalty
+   capable of generating 10Gbit/s traffic, which was the goal of this experiment. Also it is worth
+   noting that the pktgen tool will only be generating packets and sending them off. The recieving
+   software will have the added cost of implementing a working NetFlow table on top of this. This is
+   the best solution that the author could come up with, but it should be noted for future work that
+   the task of packet generation should be delagated to a tool that is not also being tested, if the
+   budget allows. 
+
+   DPDK's 'pktgen' tool is capable to generating 10Gbit wire rate traffic with 64 byte frames. It
+   has a runtime environment to configure, start and stop flows, and can diplay real time metrics.
+   To run pktgen, you first have to install dpdk on your simulator machiene. Be aware that dpdk has
+   certain bios, system and toolchain requirements for it too work properly. The critical specs for
+   the pc that was used to simulate traffic are:
+      OS: Ubuntu Linux: 4.15.0-101-generic
+      CPU: 
+      Memory:
+      NIC: X540-T1
+   For the full list of specs please see the Appendix. Note a critical requirement to run dpdk is to
+   have the sse4_2 cpu flag enabled. You also need at least 2 cores but preferable 4. A core i7 or
+   better is recommended.  
+
+   Once pktgen was running the method to perform the tests was:
+      1. set the size of the frames to be sent with the command: 
+            set 0 size [size in bytes]
+      2. set the desired traffic rate with:
+            set 0 rate [rate in percent]
+      3. set the number of packets to be sent with: 
+            set 0 count [number of packets]
+      3. when the test machiene is ready to receive, start the transmission with:
+            start 0
+      4. once the current transmission rate drops to zero, (signifying the end of the test), stop
+         the port with:
+            stp
+      5. to verify the correct bytes and packets were sent, run:
+            page stats
+   
+   The 0's in the above command signify configuring the 0th port. (The only port in this case).
+   Below we will identify how the values for size, rate and count were calculated.
+
+   The size parameter is just iterated through the different packet sizes that were tested in this
+   experiment i.e. iterated through {64, 128, 256, 512, 1024}. The rate parameter was iterated
+   through the different rates that were tested (as a percent of 10Gbit/s) i.e. {1, 10, 50, 75, 100}
+   or (100Mbit, 1Gbit, 5Gbit, 7.5Gbit and 10Gbit) respecivly. This is because pktgen calculates the
+   maximum rate it can send on the configured network card, and takes the rate as a percentage of
+   this. The count parameter is calcuated from the rate and the size. Specifically, take the rate
+   and calculate the number of bits that will be sent after transmitting for 10 seconds at that
+   rate. (All tests were performed over 10 second periods). Then divide this by the 8 to get the
+   number of bytes, and divide again by the packet size to get the number of packets.
+
+   For running the multiple flow tests, pktgen was configured to read and replay from a pcap file.
+   This pcap file was a excerpt of an irc exchange, as well as some other background flows. To
+   ensure that pktgen would run at the correct rate, it is critical to remove all the timestaps from
+   the pcap file, otherwise pktgen will add these delays in. The same commands as before can be used
+   to start the tests, so once pktgen is running and the test machiene is ready to receive, start
+   the tests with:
+      1. set 0 rate [rate in percent]
+      2. start 0. 
+   At the same time as calling the start command. Start a timer for 10 seconds. Then run the stop
+   commmand.
+      3. stp
+   Although this may seem like it introduces variance by manually starting and stopping the timer.
+   It is not a major issue as you can still read the number of sent packets and bytes and use this
+   to calculate what result you should be seeing on the test machiene, and how much byte and packet
+   loss has occoured. You can do this with
+      4. page stats
+   For example, after running page stats you may see that the number of bytes sent is _____ and the
+   number of packets is _____. Comparing these to the results from the test machiene for the number
+   of bytes and packets received of ___ and ___, you can conclude that the packet and byte loss for
+   that test is ___ and ___.
+
+   To make this process of running test simulations more efficiant, you may want to utilise pktgen's
+   scripting functionality via the Lua programming language. 
+
+
+   TEST METHODOLOGY
+
+   Below is described what happens on the test machiene. 
+   
+   The process to describe what happens on the test machiene can be split into 4 sections.
+
+   Firstly, there is the capture framework library. Included in here is the library functions, api,
+   drivers and kernel modules for the capture frameworks that were used (dpdk, netmap, pf_ring_zc).
+   For the default Linux kernel tests, this can be thought of as the kernel and system call
+   interface.
