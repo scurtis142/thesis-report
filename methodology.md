@@ -6,8 +6,6 @@
 
 ###PREVIOUS WORKS
 
-###
-
 ###METHODOLOGY / METHOD / EXPERIMENT
 
 ##Overview
@@ -201,6 +199,24 @@
    where the recieve_packets function takes a pointer to netmap's ring buffer. This function
    eventually inserts an entry into the flow table. 
 
+   The main program for the pf_ring implementation looks similar. We start by calling the
+   pfring_zc_create_cluster library function. The device is opened with the pfring_zc_open_device
+   function and the licensce is checked with the pfring_zc_check_device_license function. The main
+   packet consumer thread gets a pointer to the next oacjet by calling pfring_zc_recv_pkt_burst.
+   This pointer is then passed to the get_netflow_k_v function to get a key value entry and then
+   these are passed to the netflow_table_insert function to be inserted into the hash table
+   (explained in more detail below).
+
+   The linux kernel implimentaion work by using the raw socket interface that the kernel provides.
+   The main system calls that are needed to for this setup are the 'socket' system call, the ioctl
+   system call to set the interface to promisuious mode and the 'recvfrom' system call to get a
+   pointer to the next packet. Again, this is then passed to the relavent NetFlow table functions. 
+   
+   As part of the cleanup that happens when the process receives the interrupt signal telling it to
+   close, it prints the total packet, byte and flow counts of all the entries in the flow table. It
+   does this by looping over each list in each entry of the hash table. The reason for this is
+   explain in more detail in a later section, but this is how the throughput into the table and the
+   percent packet loss is measured.
 
 
 ##NETFLOW TABLE DESIGN
@@ -231,15 +247,64 @@
 
    To conform to these requirements the NetFlow table was implemented as a hash table. This has the
    the properties of constant inserting time (as long as the number of flows is not greater than
-   half the size of the table *referance*). 
+   half the size of the table *referance*). Note that in the case of the tests that were run in this
+   experiment, it was always the case that inserting into the table took constant time, as the
+   number of flows in the test cases were always less that the number of Flow table entries, which
+   is 1024 by default. In a real-world scenario, there may be more active flows than table entries.
+   In this case, flows would double up, with multiple flows mapping to a single table entry. This
+   is expected, and would not corrupt the data as the flows would be seperated in a list structure,
+   however, performance may begin to slow. However if optimal performace is still required with a
+   high number of flows, the user could easily modify the default start size of the table to be
+   whatever they desire, as long as computer resources permit. 
+   
+   The hashing function that is used to map flows to their corresponding hash table entries is a
+   crc32 checksum of the 5-tuple fields described by a NetFlow 'flow'. This checksum is provided by
+   hardcoded hashing tables in software, and by hashing recursivly passing each field of the flow
+   through the checksum. 
 
+   idx = crc32c_1word (key->proto, idx);
+   idx = crc32c_1word (key->ip_src, idx);
+   idx = crc32c_1word (key->ip_dst, idx);
+   idx = crc32c_1word (key->port_src, idx);
+   idx = crc32c_1word (key->port_dst, idx);
+   idx = idx % table->n_entries;
 
+   As you can see by generating the table index using each of the fields in the flow, we can get a
+   pseudo-unique index for each flow.  It is also worth noting how the "key" struct is populated.
+   This is done in the 'get_netflow_k_v' function that takes a pointer to the packet header, and
+   then traverses, 
 
-
-##TABLE EXPORTER FUNCTION
+   Once we have the index it is a simple matter of navigating to the offset and traversing the list
+   (which we expect to have a length of 1 for a low number of flows), then updating the byte and
+   packet counters for that flow. 
    
 
+##TABLE EXPORTER FUNCTION
 
+   Normally a NetFlow exporter would send expired flow data to a third party collection service. For
+   our table implementation, it was decided that it would be better to test the implementaion of a
+   Flow table a more simply way, by simpily periodically writing out the flow table as a csv file.
+   There were several reasons for this. Firstly, it was for simplicity reasons. Although the process
+   did not act like an exact or complete NetFlow exporter, it could be adapted to easily by simply
+   changeing what the exporting thread does. So the proof of concept is there. Another reason is
+   that it makes un-neccesary work to go and set up some flow collection service, as it would not
+   add anything to the project and is not within the project's scope.
+
+   The process of going exporting the flow table to a csv file was quite simple. Since the flow
+   table was designed to be thread safe (see section above), a exporting thread was set up to run
+   with a period of 1 second. This thread simply looped through each list in the hash table, copying
+   the flow information, along with the current packet and byte count to a temporary buffer,
+   seperated by commas. Once all the entries had been added to this buffer, the lock on the flow
+   table is released and the buffer is written out to a file. It is important that a temporary
+   buffer is used and there is only 1 write operation so that the exporting does not hold up the
+   task of inserting flows. Since writing is an IO operation and quite time expensive (relative to
+   other computer operations), if multiply write's are done and the inserting thread has to wait for
+   these to finish then it has to potential to drop a significant amount of packets as the
+   underlying frameworks packet buffers fill up. It is also worth noting that the exporting thread
+   does not do any processing of the flow data, such as sorting or filtering, for the same reason
+   that it would be a bad idea to do any un-nessesary work that may hold up other critical threads.
+   This sort of processing work is handled by the program that reads from the exported file, and is
+   described in the next section.  
 
 ##FLOW VISUAL TOOL
 
@@ -255,7 +320,8 @@
    packet and byte counts for the 10 biggest flows. 
 
    The visual tool is written in python and simply opens the exported csv file, sorts the entries by
-   the number of bytes and then displays a table to the top 10 biggest flows. 
+   the number of bytes and then displays a table to the top 10 biggest flows. Doing this in a loop
+   every 1 seconds gives a live updating table. 
 
    Source IP         Destination IP    Source Port   Destination Port   Protocol   Packets     Bytes
 
@@ -272,8 +338,39 @@
 
 ##COLLECTING RESULTS
 
-   whats the process of collecting results. e.g. look at pktgen output. look at flow table output.
-   put in spreadsheet. calculation for calculating packet loss.
+   The format for running the tests and collecting the results followed a methodical procedure.
+   Firstly, the correct packet count, size and offered throughtput were calculated for the packet
+   generation tool (pktgen). This is explain in more detail in section xxx. The setup script for the
+   particular framwork being tested is run, and then if there are no problems, the start script is
+   then run. This means the program is not collecting packets and populating the flow table. Then 
+   the start command is given to pktgen. The network test is now in progress. Once pktgen shows that
+   the bandwidth has dropped back down to 0, the stop and page stats commands are issued and an
+   interrupt signal is sent to the main testing program. The stats for the number of packets sent
+   and the number of bytes sent can be read from the stats page of pktgen. The test program should
+   have outputted a sum of the total number of bytes and a total number of packets in all of the
+   flows stored in the table. This way of measuring ensures accuracy that the number of packets and
+   bytes recoreded at the test machiene have made it all the way through the test procedure, rather
+   than just being read from the interface, which would be incorrect. 
+
+   One more calculation has to be done before however, because pktgen and the test process may
+   calculate the number of bytes differently. Specifically, if packet gen is given a packet size of
+   x bytes, it will actually count that packet as (x-4) bytes. As the 64 bytes includes an option
+   VLAN field sent in the ethernet header. Since this field is set to null in pktgen, it is not
+   included and the actual size of the frame is 60 bytes. On the other end of the test setup, the
+   ethernet header actually get stripped of before it is read by the NetFlow table code, and the
+   table caluclates the packet size from the ip header field. To verify the integrity of the above
+   statements, one only needs to set up an expirement where pktgen sends only 1 packet, and then
+   read the corresponding sent and received stats. Another difference is in the native flow table
+   for pf_ring_zc, which actually include the preamble and crc check into byte counts as well. To 
+   counter this inconvinance, the results table has to contain 'expected bytes' field, in which
+   takes as an input the number of bytes sent as read from the pktgen stats, and output the expected
+   number of bytes to compare against.  
+
+   Then the difference between the expected bytes and packets and the bytes and packets recieved may 
+   be used to calculate the measured throughput and percent packet loss fairly. 
+
+##OTHER NOTES
+   any other final notes with regards to the methodology (look through paper notes)
 
 ###RESULTS
 
