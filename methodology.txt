@@ -1,4 +1,17 @@
-   METHODOLOGY / METHOD / EXPERIMENT
+###ABSTRACT
+
+###INTRODUCTION
+
+###BACKGROUND KNOWLEDGE
+
+###PREVIOUS WORKS
+
+###
+
+###METHODOLOGY / METHOD / EXPERIMENT
+
+##Overview
+   XXXTODO. what was achieved overall
 
    The general format of the experiment was set up with 2 machienes, one acting as a network
    simulator, which has the task of generating network traffic for the experiment, and the other 
@@ -117,13 +130,151 @@
    scripting functionality via the Lua programming language. 
 
 
-   TEST METHODOLOGY
+##TEST METHODOLOGY
 
    Below is described what happens on the test machiene. 
    
    The process to describe what happens on the test machiene can be split into 4 sections.
+   (capture framwork, base process, netflow table, exporter, visual tool). The majority of the code
+   written and used in this experiment is in C. There was a little bit of python used for the
+   visualisation tool, and some shell scripting for automating testing and setup.
 
    Firstly, there is the capture framework library. Included in here is the library functions, api,
    drivers and kernel modules for the capture frameworks that were used (dpdk, netmap, pf_ring_zc).
    For the default Linux kernel tests, this can be thought of as the kernel and system call
-   interface.
+   interface. This is the code that is tasked with reading the packets off the nic, either by
+   polling the interface, or via interrupts / signals. This is an essential part of what we are 
+   testing in this experiment, i.e. how efficiant and fast these frameworks are at network IO. 
+
+   Although we do not directly modify the library framwork code, we do use the systems and
+   interfaces that they provide in our program. For example, we will call all initialisation
+   functions neccesary to set up the capture framworks and will use their provided api for getting
+   access to packet header and date pointers. 
+
+   As an example in each of the specific frameworks: 
+
+   For the dpdk implementation we had to call: rte_eal_init, to set up the run time enviroment,
+   rte_eth_dev_count_avail; to find the number of avaliable port, rte_pktmbuf_pool_create; to create
+   the memory buffer pool, setup ports with rte_eth_rx_queue_setup, setup all thread needed,
+   initialise the netflow table etc. The main loop with gets pointers into avaliable packets looks
+   like: 
+
+   while (!force_quit) {
+      for (i = 0; i < nr_queues; i++) {
+         nb_rx = rte_eth_rx_burst(port_id,
+               i, mbufs, 32);
+         if (nb_rx) {
+            packet_classify_bulk (mbufs, nb_rx, table);
+            for (j = 0; j < nb_rx; j++) {
+               struct rte_mbuf *m = mbufs[j];
+               rte_pktmbuf_free(m);
+            }
+            pkt_cnt += nb_rx;
+         }
+      }
+   }
+
+   where 'packet_classify_bulk' is the function that does the packet process and eventually update
+   the netflow table, although this section of the code will be discussed in a later section.
+
+   For Netmap the main library functions that are called include: nmport_prepare, parse_nmr_config,
+   nmport_open_desc. The main loop for receiving packets is: 
+
+   for (i = targ->nmd->first_rx_ring; i <= targ->nmd->last_rx_ring; i++) {
+      int m;
+
+      rxring = NETMAP_RXRING(nifp, i);
+      /* compute free space in the ring */
+      m = rxring->head + rxring->num_slots - rxring->tail;
+      if (m >= (int) rxring->num_slots)
+         m -= rxring->num_slots;
+      cur_space += m;
+      if (nm_ring_empty(rxring))
+         continue;
+
+      m = receive_packets(rxring, targ->g->burst, dump, netflow, targ->g->n_table, &cur.bytes);
+      cur.pkts += m;
+      if (m > 0)
+         cur.events++;
+   }
+
+   where the recieve_packets function takes a pointer to netmap's ring buffer. This function
+   eventually inserts an entry into the flow table. 
+
+
+
+##NETFLOW TABLE DESIGN
+
+   The NetFlow table that was implemented for use with the different framworks was designed with a
+   couple of contraints in mind. Firstly, it needed to be fast to insert and update flow entries.
+   This should be obvious as performance is the primaty metric of this report. It also needs to
+   make sure it is fast as to not affect the performance of the capture framework. If it takes too
+   long to insert an entry then the framework being tested might drop packets that it otherwise 
+   could have read. Another constraint was that it had to be as consistant as possible when used 
+   across the different frameworks. This is to ensure that the comparison between the framworks is
+   as fair as possible. However there are some exceptions to this case. Ntop, the organisation that
+   created the pf_ring_zc library, also have a native flow table implementation using the pf_ring_zc
+   table. Since useing and testing this table turned out to be not a lot of work, an analysis of
+   this table was included in this report, but it should be noted that this result was not using the
+   same flow table as the other frameworks. Another exeption was the dpdk flow table implementation,
+   which I was able to modify from an existing code base. The code in this section has a few extra
+   things that were not included in the flow tables for the other frameworks. Most of the
+   differences are negligable, but it is worth noting one change that might be significant. The DPDK
+   flow table was able to utilise hardware hashing functions whereas the other table implementation
+   used software. It is assumed that the hardware hashing functions were faster than software, but
+   it was not investigated into how much difference this made. Most other differences between the
+   design of the flow table were minor and posed no significance. A third requirement of the flow
+   table was that is it safe for multiple threads. This is due to the 'exporter' thread that
+   periodically flushes the table to do something with the data. It is not a good idea that this
+   thread has access to the table whilst other threads are inserting or updating entries. Similarly,
+   it is important that only one thread has the capability to update the table at one time. 
+
+   To conform to these requirements the NetFlow table was implemented as a hash table. This has the
+   the properties of constant inserting time (as long as the number of flows is not greater than
+   half the size of the table *referance*). 
+
+
+
+
+##TABLE EXPORTER FUNCTION
+   
+
+
+
+##FLOW VISUAL TOOL
+
+   To add a visual and practical element to this experiment, a real time flow visualiser tool was
+   implemented to test the code for the flow table in it's ability to export data, to make sure what
+   is was storing is correct, and to add a use case for this experiment. Although a normal NetFlow
+   exporter will export flows via the network in to some third party collection software, our
+   implementation took a simplified appreach. Instead of creating a full blown NetFlow exporter, the
+   NetFlow table simplify exported itsself to a temporary csv file, once per second (see section
+   above for more details). This was a flexible approach that allowes any other process to access
+   this data and use it as it wishes. For example, a process could read the file and then export the
+   flows via the network to a third party collector, or (as in our case) implement a live table with
+   packet and byte counts for the 10 biggest flows. 
+
+   The visual tool is written in python and simply opens the exported csv file, sorts the entries by
+   the number of bytes and then displays a table to the top 10 biggest flows. 
+
+   Source IP         Destination IP    Source Port   Destination Port   Protocol   Packets     Bytes
+
+   192.168.1.2       212.204.214.114   2848          6667               tcp        7124        398460
+   212.204.214.114   192.168.1.2       6667          2848               tcp        5862        4852461
+   192.168.1.2       71.10.179.129     4026          14232              tcp        1939        111254
+   71.10.179.129     192.168.1.2       14232         4026               tcp        1939        160889
+   172.200.160.242   192.168.1.2       11352         4984               tcp        1849        153177
+   192.168.1.2       172.200.160.242   4984          11352              tcp        1849        105001
+   192.168.1.2       68.206.150.243    1312          57322              tcp        1280        79794
+   24.177.122.79     192.168.1.2       8022          3863               tcp        1213        81276
+   192.168.1.2       24.177.122.79     3863          8022               tcp        1213        75429
+   192.168.1.2       67.71.69.121      1092          12492              tcp        903         43903
+
+##COLLECTING RESULTS
+
+   whats the process of collecting results. e.g. look at pktgen output. look at flow table output.
+   put in spreadsheet. calculation for calculating packet loss.
+
+###RESULTS
+
+###DISCUSSION AND FUTURE WORK
