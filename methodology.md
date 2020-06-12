@@ -3,6 +3,73 @@
 ###INTRODUCTION
 
 ###BACKGROUND KNOWLEDGE
+4000 words
+
+##THE LINUX KERNEL NETWORKING SUBSYSTEM
+363 words
+
+##HIGH PERFORMANCE TECHNIQUES
+
+#FULLY USERSPACE PROCESSES
+363 words
+
+#PREALLOCATING PACKET BUFFERS
+363 words
+
+#POLLING VS INTERRUPTS 
+363 words
+
+#DIRECT MEMORY ACCESS
+363 words
+
+#BATCH PROCESSING
+363 words
+
+#MULTIQUEUE SUPPORT
+363 words
+
+##DPDK
+363 words
+
+##NETMAP
+363 words
+
+##PF_RING_ZC
+363 words
+
+##NETFLOW
+
+https://tools.ietf.org/html/rfc3954
+https://tools.ietf.org/html/rfc7011
+
+   NetFlow is a service that provides network administrators a tool to access information about
+   flows that pass through network elements (such as a switch or router). A flow is defined as 
+   a unidirectional sequence of packets that share a common set of properties. For example 
+   downloading a file from a server could be seen as a single flow. In the case of this report, 
+   the packet metadata that defines a flow is the collection of five TCP/IP header fields: source 
+   IP, destination IP, source port, destination port and protocol (although in other implementations 
+   it may not be limited to this).  For each flow a series of useful metrics are collected for 
+   analysis. For example a running total count of packets and bytes in each flow, and the start and 
+   end time of each flow.
+
+   NetFlow provides a fine grained look at traffic running through a network that enables highly
+   detail and flexible analysis of a network and resource gathering method. Some of its main usages
+   are in: network, application and user monitoring and profiling, security analysis, capacity
+   planning, data warehouseing, ISP billing, and data mining.  
+   
+   Netflow works on an exporter/collector model. A NetFlow Exporter process will run on network 
+   devices and collect flow information from traffic passing through the device. The information 
+   is stored in a flow table and then sent to a collecting process in the form of a flow record once 
+   the flow has finished (determined by the tcp fin flag), or after a timeout has occoured. A 
+   collecting process recieves flow records from one of more exporting processes and may exist on a 
+   different netword device. The collecting process can then perform an neccessary analysis or long 
+   term storage of the data. The communication process between a NetFlow exporter and collector is
+   defined in RFC 3954 and is done via an application level protocol and Flow template records.
+
+   For this experiment a partial NetFlow exporter was implmented. It is capable of classifying
+   incoming packets to different flows and storing them in a table with a running packet and byte
+   count. However instead of exporting them to a collecting process, it just displays a real time
+   visualisation of data passing through the interface. 
 
 ###PREVIOUS WORKS
 
