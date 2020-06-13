@@ -18,7 +18,40 @@
 
 ##INTRODUCTION/PROBLEM
 
-   Things such as network analysis, flow
+Enberg, "On Kernel-Bypass Networking and Programmable Packet Processing",
+Medium, 2019.
+High speed packet capture solutions for Enterprises - Endace",
+Endace.com
+
+   It is now commonplace for network speeds to reach 10-40Gbps or beyond in commercial environments
+   such as businesses, government, hospitals, universities etc. *reference* High-end network
+   interface cards (NICS) can even reach speeds of 200Gbps *reference*. These speeds are becoming so
+   fast that it is hard for commodity hardware and software to keep up with network capacity, and
+   they are constantly becoming bottlenecks in high-speed network operations. 
+
+   Network operations such as routing, switching, network analysis, flow analysis, firewalls,
+   intrusion detection systems etc, all require special hardware and equipment to operate at these
+   speeds without latency or packet loss.  These solutions can be expensive and hard to set
+   up,*referance* but the alternative of using commodity hardware and software like the Linux kernel
+   often does not provide the required performance. This is because the kernel networking stack is
+   slow, with multiple steps to pass packets up to userspace, copying data multiple times and
+   wasteful context switching operations. 
+
+   One technology that provides a workaround to this is kernel bypass. This, along with a  variety 
+   of high performance techniques can be employed to speed up the processing of packets by bypassing
+   the kernel and allowing a userspace process to access packets directly from the NIC.
+
+   In recent years, several software frameworks have emerged that provide a variety of different
+   services to improve networking speed on commodity hardware. Some of the more promising include
+   DPDK, PF_RIN_ZC and Netmap. While these frameworks all differ slightly in implementation,
+   purpose, features offered and avaliability, they all provide substantial speedup in packet processing.
+
+*Could expand slightly on the methodology*
+   This report deveops a methodology to test and compare the packet processing ability of the
+   framworks mentioned above, in their ability to provide a capture framework for a partially
+   working NetFlow exporter. It analyses the results of the measured throughput received by the
+   NetFlow exporter, based on the underlying capture framework. The results analysed are dependant
+   on several variables: offered load, packet size and number of flows.  
 
 ##PURPOSE
 
@@ -35,6 +68,43 @@
 
 ##THE LINUX KERNEL NETWORKING SUBSYSTEM
 457 words
+
+   The current networking stack for a standard Linux distribution can be split into 3 sections: the
+   physical layer, user space and kernel space. The kernel space can be split into a further 5
+   sub-layers: System call Interface, Protocol Agnostic Interface, Network Protocol layer, Device
+   Agnostic Interface and Device Drivers. [4] Each of these layers plays a role in moving a packet
+   from the application process to the network device, and vice versa. 
+   
+   The system call interface allows a user process to access a socket via common read() and write()
+   operations on a file descriptor. This is the starting point of the network stack. 
+   
+   The protocol-agnostic interface calls the sendmsg() function pointed to by the ops field of the
+   socket struct. For example, in the case of the INET socket, it would call inet_sendmesg(). 
+   
+   The inet_sendmesg() function will then call a protocol-specific function. For example, if the
+   protocol used is TCP, then the kernel will now enter the TCP handling code, which breaks the
+   packet up into chunks according to the TCP protocol and writes them to sk_buff structures. The
+   sk_buff structures then have IP headers applied and are passed through various firewall checks
+   and/or NAT/masquerading. 
+   
+   The sk_buff struct is now passed to the device-agnostic layer, where Qos and queueing routines
+   are applied.
+  
+   The last step happens when the packet is dequeued and then the buffer is passed to the device
+   driver when ready, for sending out the interface. [5] Figure 1: Linux Networking Stack [6] 
+   
+   The kernel, through the use of this stack, provides a variety of services to applications wishing
+   to utilise the network. Things such as checksum handling, routing, transport, network, link-layer
+   protocols, interfacing to hardware and useful networking APIs such as sockets, are all offered to
+   the application by the kernel. This make network programming very simple for application
+   processes.  However, using the default kernel networking stack has several limitations. For one,
+   the main data structures used in the kernel for handling devices and packets (e.g. the sk_buff
+   structure which holds packet data) are constantly copied to different locations and structures
+   [7].  This can be quite costly when done at high rates. Another downside is the fact that there
+   needs to be a context switch from user mode to kernel mode. This wastes considerable CPU cycles
+   when done frequently.
+
+75 words to go (not needed if the other frameworks section is filled in 
 
 ##HIGH PERFORMANCE TECHNIQUES
 
@@ -154,6 +224,9 @@ https://tools.ietf.org/html/rfc7011
    incoming packets to different flows and storing them in a table with a running packet and byte
    count. However instead of exporting them to a collecting process, it just displays a real time
    visualisation of data passing through the interface. 
+
+##OTHER FRAMEWORKS
+75 words
 
 ###LITERATURE REVIEW
 
