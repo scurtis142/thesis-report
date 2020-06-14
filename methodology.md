@@ -184,12 +184,86 @@ Operating Systems: Internals and design principals, Global edition 2018
 
 ##DPDK
 457 words
+ https://www.dpdk.org/about/
+ https://blog.selectel.com/introduction-dpdk-architecture-principles/.
+ https://doc.dpdk.org/guides/prog_guide/overview.html
+
+   
+   DPDK (Data Plane Development Kit) consists of a collection of data plane and networking libraries
+   that allow for accelerated packet processing on a variety of CPU architechtures and network
+   cards. It is an open-source software platform originally developed by Intel and managed by the
+   Linux foundation. It has a high degree of configurability.
+   
+   Uses a EAL (environment abstraction layer) (hides environmnet specifics from applications and
+   libraries) to create libraries for specific environments. User
+   may link with library to create their own applications. Other feature libries independant to eal
+   are also offered. (ie for processing). All resources myst be allocated prior to calling data plan
+   applications (run to completion model)(prallocating packet buffers). Does not support scheduler
+   (will take up 100% of logical core it is running on) and all devices are accessed by polling.
+   Pipeline model is possible by passing packets or messages between cores using rings. Work to be
+   formored in stages and efficient use of code on cores (batch processing). Support for
+   multic-process and multi-thread exeution types. Core affinity.
+
+   *good place to display diagram from dpdk documentation*
+   core componants: rte_timer: timer facilities based on HPET. ability to execute function
+   asyctronously. periodic or single function calls. rte_mempool: handling pool of objects
+   in ring buffer. bulk enqueue/dequeue. per core object cache, alignment. rte_mbuf: manipulation of
+   packet buffers. created at startup time and stored in mempool. rte_ring: when packet arrive on
+   the network card they are sent to a ring buffer, managed by rte_ring. storing obejcts in a
+   table. adapted to bulk operations, faster. can be used for general communication.  rte_malloc:
+   allocation of memory zones, rte_eal: puts it all together. librte_net: networking libraries.
+
+   DPDK uses a differnt driver to the standard intel ixgbe to drive network cards. It uses a UIO
+   driver (uio_pci_generic) that allows the network controller to communicate directly to memory
+   regions of a userspace program. It is a special kind of driver that aims to do most of its
+   processing in userspace. Unlike Netmap, once this driver is loaded, the kernel is unable to
+   access the network card until the new driver is unloaded again. This means that dpdk will take
+   full control of the network card and other (non-dpdk) applications will not be able to use it
+   until the driver is unbound. 
+
+   DPDK must have hugepages enabled in the kernel to operate. This allows the network card to dump
+   packet contents directly into the memory of the application process, effectivly doing the same
+   thing as DMA.
+
+   DPDK offers a variety of features on top of the basic networking operations. Some of these
+   additional features include:
+      speed capabilties
+      queues
+      filters (vlan filter)
+      flow control
+      flow api
+      stats
+      checksum offloading
+      rate limiting
+      traffic mirroring
+      longest prefix matching
+   
+   Some known applications that utilise DPDK as their underlying network stack are: DPDK vSwitch
+   *referance*, and accelerated version of Open vSwitch, xDPd, a high-performance software switching
+   solution, TRex, which is an open source traffic generator that uses DPDK, and DTS, which is a
+   python based framwork for functional tests and benchmarks. 
 
 ##NETMAP
 457 words
 
+intro
+internals (how it works under the hood and what of the above techniques it uses)
+features
+applications that use dpdk
+
 ##PF_RING_ZC
 457 words
+
+intro
+internals (how it works under the hood and what of the above techniques it uses)
+features
+applications that use dpdk
+
+##TABLE COMPARING THE H-P TECHNIQUES THAT EACH FRAMWORK OFFERS
+75 words
+
+##OTHER FRAMEWORKS
+75 words
 
 ##NETFLOW
 
@@ -225,10 +299,8 @@ https://tools.ietf.org/html/rfc7011
    count. However instead of exporting them to a collecting process, it just displays a real time
    visualisation of data passing through the interface. 
 
-##OTHER FRAMEWORKS
-75 words
-
 ###LITERATURE REVIEW
+4 different papers
 
 ###METHODOLOGY / METHOD / EXPERIMENT
 
