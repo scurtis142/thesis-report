@@ -54,14 +54,53 @@ Endace.com
    on several variables: offered load, packet size and number of flows.  
 
 ##PURPOSE
+   The purpose of this report is to perform an investigation into three software frameworks (DPDK,
+   PF_RING_ZC and Netmap) that provide high-performance network operations on commodity hardware.
+   Secondly this thesis will develop a basic netflow exporter implementation which is able to use
+   these software libraries as its underlying capture framework. The software libraries will be
+   tested on their ability to perform packet capture and insertion into the netflow table. They will
+   be analysed based on their measured throughput into the NetFlow table. They will be tested with
+   different traffic rates, packet sizes, and number of flows. 
 
 ##AIMS
+
+   To compare the packet capture performance of various avaliable cutting edge technologies at a
+   high bandwidth on commodity hardware
+
+   To test the limits of fast packet capture for commodity hardware running the Linux operating
+   system.
+
+   To implement a NetFlow exporter which is agnostic to the underlying capture framework and easily
+   interfaces to the different libraries.
+
+   To be able to populate a NetFlow table and export NetFlow at a line rate of 10Gbit/s.
+
+   To investigate the various techniques that are at the cutting edge of fast packet capture.
 
 ##COVERAGE
 
 #IN SCOPE
+   Packet Capture
+   Packet Processing
+   NetFlow exporting
+   DPDK, PF_RING_ZC, Netmap
+   Kernel bypass and high speed technologies
+   Linux OS
+
 #OUT SCOPE
+   Packet forwarding
+   Deep packet inspection / analysis
+   NetFlow collection
+   Creation of a low level capture framework
+   Using specialised hardware
+   Other frameworks (Packet_nmap, snabb, packet_shader, PFQ, BPF)
+   Modifying the kernel stack
+
 #RELAVENCE
+   40Gbits/s networking exists today and is only getting faster. Software can't keep up.
+   Performance hardware is expensive
+   Linux is a popular and practical OS in todays computing world.
+   These frameworks are the cutting edge of fast packet capture.
 
 ###THEORY
 4000 words
@@ -675,6 +714,7 @@ https://tools.ietf.org/html/rfc7011
    any other final notes with regards to the methodology (look through paper notes)
 
 ###RESULTS
+   dont forget to write about the success or failure of the netflow table
 
 ###CONCLUSIONS
 
