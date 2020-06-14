@@ -187,6 +187,8 @@ Operating Systems: Internals and design principals, Global edition 2018
  https://www.dpdk.org/about/
  https://blog.selectel.com/introduction-dpdk-architecture-principles/.
  https://doc.dpdk.org/guides/prog_guide/overview.html
+ https://en.wikipedia.org/wiki/Data_Plane_Development_Kit#Projects
+ https://doc.dpdk.org/guides/nics/features.html#free-tx-mbuf-on-demand
 
    
    DPDK (Data Plane Development Kit) consists of a collection of data plane and networking libraries
@@ -206,11 +208,13 @@ Operating Systems: Internals and design principals, Global edition 2018
 
    *good place to display diagram from dpdk documentation*
    core componants: rte_timer: timer facilities based on HPET. ability to execute function
-   asyctronously. periodic or single function calls. rte_mempool: handling pool of objects
-   in ring buffer. bulk enqueue/dequeue. per core object cache, alignment. rte_mbuf: manipulation of
-   packet buffers. created at startup time and stored in mempool. rte_ring: when packet arrive on
-   the network card they are sent to a ring buffer, managed by rte_ring. storing obejcts in a
-   table. adapted to bulk operations, faster. can be used for general communication.  rte_malloc:
+   asyctronously. periodic or single function calls. rte_mempool: handling pool of objects in ring
+   buffer. bulk enqueue/dequeue. per core object cache, alignment. rte_mbuf: manipulation of packet
+   buffers. created at startup time and stored in mempool. rte_ring: when packet arrive on the
+   network card they are sent to a ring buffer. works on producer consuer model, where packets are
+   placed onto one end of the buffer and the application checks regularly from the same buffer for
+   new data. has seperate pointer for producer and consumer, managed by rte_ring. storing obejcts in
+   a table. adapted to bulk operations, faster. can be used for general communication.  rte_malloc:
    allocation of memory zones, rte_eal: puts it all together. librte_net: networking libraries.
 
    DPDK uses a differnt driver to the standard intel ixgbe to drive network cards. It uses a UIO
@@ -242,6 +246,8 @@ Operating Systems: Internals and design principals, Global edition 2018
    *referance*, and accelerated version of Open vSwitch, xDPd, a high-performance software switching
    solution, TRex, which is an open source traffic generator that uses DPDK, and DTS, which is a
    python based framwork for functional tests and benchmarks. 
+
+532 words (75 more)
 
 ##NETMAP
 457 words
