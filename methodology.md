@@ -143,15 +143,40 @@ Endace.com
    needs to be a context switch from user mode to kernel mode. This wastes considerable CPU cycles
    when done frequently.
 
-75 words to go (not needed if the other frameworks section is filled in 
+75 words to go (not needed if the other frameworks section is filled in)
 
 ##HIGH PERFORMANCE TECHNIQUES
 
 #FULLY USERSPACE PROCESSES
 300 words
+   
+   To provide some protection and saftey, as well as provide some useful abstrations from
+   lower-level details, an operating system will usually offer a set of system calls for application
+   processes to communicate to underlying hardware (such as a network card) in a simple way. When a
+   process wishes to use the underlying hardware, an application will call these systems calls, and
+   the kernel will come in to do the work. However, when this happens, the cpu must suspend the
+   currently running program, paging it into memory, along with all cpu registers. Then it will page
+   in the kernel program from memory to perform the required task, i.e. reading something from the
+   network card, and then reverse the process, putting previously running application back into the
+   cpu registers and begin running it again. This process is called a context switch. It takes up
+   valueble time that the processes could use to do other things such as runnig the program. If this
+   sequence of event happens frequently, such as when a large amount of network traffic is hitting
+   the NIC, then it could casue significant performance issues. 
+   
+   One way to get around this, is to have the application handle all of the communication with
+   network card in its own process space, removing the need for the kernel and eliminating context
+   switches. This entails good performance benefits at the cost of more complexity.
 
 #PREALLOCATING PACKET BUFFERS
 300 words
+
+   Allocation memory is a costly application, as it involves a system call to the kernel and
+   possible reshufflling of a processes memory layout *need reference*. In a high performance
+   operation, an application should avoid doing consistent memory allocation operations. This means
+   it is better to allocation large portions of memory at the beginning of the processes life, to
+   hold enough space for all potential packets. In a normal application this would be undesirable as
+   it would be an unnessesary waste of system resources, however in a high performace operation, we
+   can take advantage of excess memory to have packet bufferers pre-allocated to save time. 
 
 #POLLING VS INTERRUPTS 
 300 words
@@ -218,8 +243,23 @@ Operating Systems: Internals and design principals, Global edition 2018
 #BATCH PROCESSING
 300 words
 
+   https://fd.io/vppproject/vpptech/
+
+   Batch processing is the idea of processing multiple packets at once. If you imagine the
+   processing of a packet as a sequence of steps, a normal sequence of events would involve
+   processing the first packet through step one, then step two and three etc, until completion. The
+   idea behind batch processing, is instead of taking a single packet, the application would take a
+   vector of recieved packets, and pass them all through processing step one, then, after they are
+   all through step one, pass them all through step to. For each step in processing, you call it on
+   each of the packets before moving onto the next. The reason behind this, is is that it keeps the
+   instruction cache 'hot' with the instructions from the current step, so that each step perfomed
+   on a packet is faster than if the packets were passed throgh one at a time.
+
 #MULTIQUEUE SUPPORT
 300 words
+
+   yeah so when packets come in you allocate them to different queues so they can be serviced by
+   different threads.
 
 ##DPDK
 457 words
@@ -346,6 +386,29 @@ https://tools.ietf.org/html/rfc7011
 
 ###LITERATURE REVIEW
 4 different papers
+
+   https://www.net.in.tum.de/publications/papers/gallenmueller_ancs2015.pdf
+   A comparison of the 3 frameworks (DPDK, PF_RING_ZC, Netmap), are looked at in a research paper
+   from the Technische Universität München by Gallenmüller et al. It compares the frameworks on
+   their ability to forward packets. The paper evaluates the frameworks both on measured throughput
+   and latency. The results of this paper show that PF_RING_ZC and DPDK are significantly superior
+   to Netmap in both throughput and latency, with DPDK slighly better that Pf_ring. However ther
+   report stats that Netmap has the added advantage of "interface continuity and system robustness".
+   The paper only compares the frameworks on their ability to forward packets, it does not look at
+   their ability to do packet capture and analysis (which is what is required to implement a NetFlow
+   table). The paper also does not look to compare the frameworks against the standard Linux kernel. 
+
+   A research paper by García-Dorado et al, presents a comprehensive theoretical investigation of
+   various capture frameworks (PacketShader, PFQ, netmap & PF_RING_DNA). They test the effect of
+   many different metrics on the measured throughput of the frameworks, such as number of CPU cores
+   and packet sizes. The authors of this paper only analysed packet capturing capabilities and
+   ignored other aspects of packet procesing *reword*
+
+   https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2015/159378r.pdf
+   The research paper produced by US government organisation 'Sandia' looks at packet loss between
+   Netmap, Pf_ring and the Linux kernel when tested at high network speeds. The report also compares
+   Netmap on two different operating systems: FreeBSD and Linux. The results show that the FreeBSD
+   performs slightly better than Linux, but its results have much greater varience. 
 
 ###METHODOLOGY / METHOD / EXPERIMENT
 
