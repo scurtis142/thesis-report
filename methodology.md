@@ -331,24 +331,85 @@ Operating Systems: Internals and design principals, Global edition 2018
 ##NETMAP
 457 words
 
-intro
-internals (how it works under the hood and what of the above techniques it uses)
-features
-applications that use dpdk
+   http://info.iet.unipi.it/~luigi/netmap/
+   http://info.iet.unipi.it/~luigi/papers/20120503-netmap-atc12.pdf
+
+   Netmap is a project that came out of the Universitá di Pisa, which was lead by researcher Luigi
+   Rizzo and supported by the european commision under a project called CHANGE. It is a framework
+   for high speed packet I/O. Netmap is implemented as a kernel module and collection of libraries
+   that can be used as an API. It is avaliable for Linux Windows and FreeBSD. Netmap still uses
+   partial operating system network stack for low lever operations that are potentially dangerous
+   such as driving the NIC and validating memory. However it still makes use of well known
+   performance techniques: preallocating memory-mapping packet buffers, IO batching and its send and
+   receive buffers are circular (ring) buffers (this matches the hardware implementation).
+
+   Netmap supports most common network cards, and will allow access to the network card. It supports
+   libpcap for reading from and storing packet traces, and says it can reach 10Gbit/s (line rate on
+   a 10Gbit NIC). It is built in such a way that it is very easy to use and port applications that
+   use raw sockets to netmap because of its system-call like interface. 
+
+   Some application that are built on top of netmap are the vale software switch, click (a free
+   software router) and ipfw (IP Firewall), for useing a pc as a firewall.
 
 ##PF_RING_ZC
 457 words
 
-intro
-internals (how it works under the hood and what of the above techniques it uses)
-features
-applications that use dpdk
+   PF_RING_ZC is a kernel module built by Ntop for the Linux operating system [10]. It allows a high
+   rate of packet processing and offers line-rate performance into the 10Gb/s [11]. The zero copy
+   capture interface does require a licensce, however free licences are avaliable for educational
+   reseach and non-for-profit purposes. 
+   
+   PfRingzc does not use standard system calls, instead using its own functions and drivers. It
+   offers a variety of features such as multicore support, and the driver can dump packet contents
+   into memory where the application running on the cpu can access. As you can tell be the name, it
+   is a ring buffer based approach, similar to dpdk, and also offers a zero copy API, which improves
+   performance by reducing unnessesary copying of data. 
+
+   The zero-copy API is application and developer focussed, rather than hardware focussed and is
+   easier to use than some of the other frameworks.  Its network driver has a feature where you can
+   switch between kernel bypass mode, and then back to the network stack when required. This makes
+   it a very versatile technology with applications running on a personal computer easily switch
+   between running high performance operation and having a full network stack.
+
+   Several applications exist on top of Pf_ring_zc, mostly other products produced by Ntop. For
+   example: N2disk, a traffic recording and replay tool. Nprobe, which provides flow based traffic
+   analysis and Ndpi for deep packet inspection, among others. 
+
+235 words
 
 ##TABLE COMPARING THE H-P TECHNIQUES THAT EACH FRAMWORK OFFERS
 75 words
 
 ##OTHER FRAMEWORKS
 75 words
+   
+   There are several alternative high performance libraries avaliable other than the ones analysed
+   in this report. Snabb, packet_shader, PFQ, BPF, pf_ring (vanilla), fd.io, Packet_nmap. 
+
+   Snabb is a powerful packet processor, and also has an easy to use design philosophy. It has good
+   scripting support and is quite easy to get an application up and running. However it is a fairly
+   new technology and has not had as much adoption into applications.
+
+   *packet shader*
+   https://dl.acm.org/doi/pdf/10.1145/1851182.1851207
+   PacketShader is a high performace software router framework for general packet processing with a
+   graphics processing unit (GPU). This report won't analyse PacketShader as it is more geared
+   towards routing, which is out of the scope of this report.
+
+   *pfq*
+   *bpf*
+
+   PF_RING_ZC also has a predesessor technology (Pf_ring vanilla) that is produced by the same
+   company (ntop) however since the zero copy version of the technology is strictly better than the
+   vanilla version (for the purposes of this report), the vanilla version was not tested.
+
+   Fd.io is a vector packet processesing library for high performance. It is worth looking into for
+   anyone continuig this work, but due to time contraints, it did not get analysed in this report. 
+
+   The reason that DPDK, Netmap and Pf_ring_zc were chosen for analysis are because of their
+   popularity, and also because they are the most competitive at the time of writing.
+   
+   *packet nmap*
 
 ##NETFLOW
 
@@ -408,7 +469,16 @@ https://tools.ietf.org/html/rfc7011
    The research paper produced by US government organisation 'Sandia' looks at packet loss between
    Netmap, Pf_ring and the Linux kernel when tested at high network speeds. The report also compares
    Netmap on two different operating systems: FreeBSD and Linux. The results show that the FreeBSD
-   performs slightly better than Linux, but its results have much greater varience. 
+   performs slightly better than Linux, but its results have much greater varience. *not finished*
+
+   *put one more paper here*
+
+   The literature above shows that there is substantial knowledge about the performance of Linux
+   networking and high-performance frameworks have been analysed thoroughly. However most of these
+   literary papers only compare the frameworks on their packet forwarding ability rather than in the
+   case of this report where we are looking into the packet header fields and populating a NetFlow
+   table. There are also only a few papers that compare multiple frameworks together, rather than
+   exclusivly. 
 
 ###METHODOLOGY / METHOD / EXPERIMENT
 
